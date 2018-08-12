@@ -1,0 +1,40 @@
+Strela is a neural network package that replicates some of the functionality of pytorch.
+
+
+strela_net class - the strela class contains the weights of a neural net and the methods for producing estimates, updating the weights via back-propagation, and training the network
+
+methods:
+
+init - initialize the instance
+
+
+
+classify - given an input produces a classification output
+
+# set the first x input to be the training point input
+x_l(0) = inputs
+
+# iterate through the layers
+for l in Layers:
+	# matrix multiply and set that to x_jl matrix
+	x_l = activation(weights[l] * x_l[l-1])
+	# include a zeroeth coordinate 1
+
+
+train - given an array of inputs and correct labels trains the strela using SGD and backpropagation
+
+(loop through the training set)
+self.classify()
+calculate delta_L
+delta_L = 2 * (predicted - actual) * (1 - x1L^2)
+#iterate backwards through the layers
+for l in reverse(2, L):
+	# matrix multiply weights of layer by delta
+	w*signma = wij * sigma
+	# element multiply by outputs
+#update the weights
+for l in range(1, L):
+	wij = wij - n * xi(l-1) * sigma
+	
+
+
