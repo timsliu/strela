@@ -37,7 +37,7 @@ def test_predict(n_in, n_out, h_layers = 3, h_layers_d = 5):
     print(y_pre)
     return
 
-def test_train(h_layers = 1, h_layers_d = 2, lr = 0.1):
+def test_train(h_layers = 2, h_layers_d = 2, lr = 0.1):
     '''stimple test of strela net training. Randomly generates points in a 
     multi-dimensional space and trains the net on them. Then evaluates on
     a separate test set. The training set has multiple x inputs and
@@ -46,9 +46,9 @@ def test_train(h_layers = 1, h_layers_d = 2, lr = 0.1):
     This function tests a linearly separable dataset with a single y
     coordinate'''
     
-    n_input = 1         # dimensionality of the space
-    train_size = 10   # size of the training set
-    test_size = 10     # size of the test set
+    n_input = 5         # dimensionality of the space
+    train_size = 100   # size of the training set
+    test_size = 30     # size of the test set
     
     # generate random x values
     x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
@@ -58,7 +58,7 @@ def test_train(h_layers = 1, h_layers_d = 2, lr = 0.1):
     y_train = [1 if sum(x) > 1 else -1 for x in x_train]
     y_test = [1 if sum(x) > 1 else -1 for x in x_test]
     
-    print("y_test")
+    print("y_test:")
     print(y_test)
     
     # create instance of strela net
@@ -87,3 +87,49 @@ def test_train(h_layers = 1, h_layers_d = 2, lr = 0.1):
     #print(my_strela.x_l)
     
     return 
+
+def test_simple(lr = 0.1):
+    '''hard coded version of test_train. Instead of a randomly generated
+    test set, this function tests the train method on a linearly separable
+    one dimensional test set. The neural net is initialized to have
+    no hidden layer
+
+    inputs: lr - learning rate'''
+
+    test_size = 100
+    
+    
+    # generate random x values
+    x_train = [[-0.5], [0.7], [-0.9], [0.3], [0.8], [-0.2], [0.8], [-0.6], [-0.6]]
+    x_test = 10 * (np.random.rand(test_size, 1) - 0.5)    
+    # generate y values; separating line is at 0
+    y_train = [1 if sum(x) > 0 else -1 for x in x_train]
+    y_test = [1 if sum(x) > 0 else -1 for x in x_test]
+    
+    print("y_test:")
+    print(y_test)
+    
+    # create instance of strela net
+    # 1 input 1 output no hidden layer
+    my_strela = strela_net(1, 1, 0, 0, lr)
+    # train the net
+    my_strela.train(x_train, y_train)
+    
+    # predict the test set
+    y_pre_raw = my_strela.predict(x_test)
+    print("Predictions:")
+    print(y_pre_raw)
+    # apply floor function to test set
+    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
+    print("y_predicted:")
+    print(y_pre)
+    
+    # check if predictions match actual values
+    correct = 0
+    for i in range(test_size):
+        if y_pre[i] == y_test[i]:
+            correct += 1
+            
+    print("Fraction correctly classified: ", correct/test_size)
+    
+    return

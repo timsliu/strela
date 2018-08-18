@@ -19,6 +19,10 @@
 # 07/26/18    Tim Liu    wrote training method - needs to be checked
 # 07/28/18    Tim Liu    updated activation to be recursive and accept arbitrary
 #                        input dimensions
+# 08/13/18    Tim Liu    cleaned up print statements in training method for
+#                        debugging
+# 08/13/18    Tim Liu    removed unnecessary square in derivative of
+#                        error function in training method
 
 import numpy as np
 
@@ -106,27 +110,39 @@ class strela_net():
         for n in order:
             # generate the prediction; pass 2D array and get back 2D array;
             # pull the zeroth element of return to have 1D array prediction
+            print("\n\nTest point: ", n, "  ", x_all[n], y_all[n])
+            print("initial x_l:")
+            print(self.x_l)
             y_pre = self.predict([x_all[n]])[0]
+            print("updated x_l:")
+            print(self.x_l)
             # calculate the sigma of the last layer - layer L
-            print("\n\nTest point: ", n)
-            print("Before Predicted: ", y_pre)
-            print("Actual: ", y_all[n])
+            print("Before Predicted: ", y_pre, "  Actual: ", y_all[n])
             print("Squared error: ", (y_pre - y_all[n])**2)
+            # check this step
             self.delta_l[self.total_layers] = np.array([2 * (1 - y_pre**2) * \
-                                              (y_pre - y_all[n])**2])
+                                              (y_pre - y_all[n])])
+
             # go backwards in L and calculate the deltas
-            for l in reversed(range(2, self.total_layers)):
+            for l in reversed(range(2, self.total_layers + 1)):
                 # back-propagate the deltas
                 self.delta_l[l-1][1:] = ((1 - np.array(self.x_l[l-1])**2) * \
                                     np.dot(self.weights[l], self.delta_l[l]))[1:]
+            print("Delta:")
+            print(self.delta_l)
             # now update the weights
+            print("previous weights:")
+            self.show_weights()
             for l in range(1, self.total_layers + 1):
                 # update weights of each layer
                 self.weights[l] -=\
-                    self.lr * np.dot(self.x_l[l-1], np.transpose(self.delta_l[l]))*np.array(y_all[n])
-                print(np.array(y_all[n]))
+                    self.lr * np.dot(self.x_l[l-1], np.transpose(self.delta_l[l]))
+            print("updated weights:")
             self.show_weights()
-            print("After: ", self.predict([x_all[n]])[0])
+            y_pre = self.predict([x_all[n]])[0]
+            print("After: ", y_pre)
+            print("Squared error: ", (y_pre - y_all[n])**2)
+
         return
     
     def predict(self, x_all):
