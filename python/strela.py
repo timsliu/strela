@@ -23,6 +23,10 @@
 #                        debugging
 # 08/13/18    Tim Liu    removed unnecessary square in derivative of
 #                        error function in training method
+# 08/13/18    Tim Liu    changed dimension of x_l in final layer to n_outputs
+#                        + 1 to ensure consistent indexing
+# 08/13/18    Tim Liu    commented out special x_l case for final layer
+# 08/22/18    Tim Liu    modified x_l matrix so final layer has 0th index output
 
 import numpy as np
 
@@ -81,18 +85,22 @@ class strela_net():
                 # "output" of zeroeth layer is the x point being trained on
                 self.x_l.append(np.zeros((self.n_inputs + 1, 1)))
             elif l == self.total_layers:
-                self.x_l.append(np.zeros((self.n_outputs, 1)))
+                self.x_l.append(np.zeros((self.n_outputs + 1, 1)))
             else:
                 self.x_l.append(np.zeros((self.h_layers_d + 1, 1)))
                 
             # set up dimensions of delta
             self.delta_l.append(np.zeros((self.j_l[l] + 1, 1)))
+
+            print("\nlayer:", l)
+            print("delta: ", np.shape(self.delta_l[l]))
+            print("weights ", np.shape(self.weights[l]))
+
             
         # set up the xl bias terms
         for l in range(self.total_layers):
             self.x_l[l][0][0] = 1
-            
-        
+                    
         return
     
 
@@ -120,14 +128,15 @@ class strela_net():
             print("Before Predicted: ", y_pre, "  Actual: ", y_all[n])
             print("Squared error: ", (y_pre - y_all[n])**2)
             # check this step
-            self.delta_l[self.total_layers] = np.array([2 * (1 - y_pre**2) * \
-                                              (y_pre - y_all[n])])
+            final_delta = np.array([2 * (1 - y_pre**2) * (y_pre - y_all[n])])
+            self.delta_l[self.total_layers] = np.concatenate((np.array([[0]]), final_delta), axis = 0)
+            print(self.delta_l[self.total_layers])
 
             # go backwards in L and calculate the deltas
             for l in reversed(range(2, self.total_layers + 1)):
                 # back-propagate the deltas
-                self.delta_l[l-1][1:] = ((1 - np.array(self.x_l[l-1])**2) * \
-                                    np.dot(self.weights[l], self.delta_l[l]))[1:]
+                self.delta_l[l-1][1:] = (1 - np.array(self.x_l[l-1])**2)[1:] * \
+                                    np.dot(self.weights[l], self.delta_l[l])[1:]
             print("Delta:")
             print(self.delta_l)
             # now update the weights
@@ -164,16 +173,20 @@ class strela_net():
                 s_j = np.transpose(np.dot(np.transpose(self.x_l[l-1]), self.weights[l]))
                 
                 # special case - final layer x_l is simply post activation
-                if l == self.total_layers:
-                    self.x_l[l] = self.activation(s_j)[1:]
+                # should be able to remove this special case
+                #if l == self.total_layers:
+                #    self.x_l[l] = self.activation(s_j)[1:]
                 # all other layers - don't overwrite 1
-                else:
+                #else:
                     # apply the activation and get the result
-                    self.x_l[l][1:] = self.activation(s_j)[1:]
+                self.x_l[l][1:] = self.activation(s_j)[1:]
                 # print("layer index: ", l)
             # prediction is the output of the final layer
             # print(self.x_l[self.total_layers])
-            y_pre[n] = (self.x_l[self.total_layers]).reshape(self.n_outputs,)
+            # reshape to be one dimensional array; zeroeth term is not applicable
+            print(self.x_l)
+            y_pre[n] = (self.x_l[self.total_layers]).reshape(self.n_outputs + 1,)[1:]
+
         
         return y_pre
     

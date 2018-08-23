@@ -111,7 +111,7 @@ def test_simple(lr = 0.1):
     
     # create instance of strela net
     # 1 input 1 output no hidden layer
-    my_strela = strela_net(1, 1, 0, 0, lr)
+    my_strela = strela_net(1, 1, 1, 5, lr)
     # train the net
     my_strela.train(x_train, y_train)
     
