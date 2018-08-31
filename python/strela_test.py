@@ -37,7 +37,7 @@ def test_predict(n_in, n_out, h_layers = 3, h_layers_d = 5):
     print(y_pre)
     return
 
-def test_train(h_layers = 2, h_layers_d = 2, lr = 0.1):
+def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
     '''stimple test of strela net training. Randomly generates points in a 
     multi-dimensional space and trains the net on them. Then evaluates on
     a separate test set. The training set has multiple x inputs and
@@ -47,7 +47,7 @@ def test_train(h_layers = 2, h_layers_d = 2, lr = 0.1):
     coordinate'''
     
     n_input = 5         # dimensionality of the space
-    train_size = 100   # size of the training set
+    train_size = 300   # size of the training set
     test_size = 30     # size of the test set
     
     # generate random x values
@@ -55,8 +55,11 @@ def test_train(h_layers = 2, h_layers_d = 2, lr = 0.1):
     x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
     # generate y values; hyperplane separating points is sum of coefficients
     # equalling 1
-    y_train = [1 if sum(x) > 1 else -1 for x in x_train]
-    y_test = [1 if sum(x) > 1 else -1 for x in x_test]
+    y_train = [1 if sum(x) > -1 else -1 for x in x_train]
+    y_test = [1 if sum(x) > -1 else -1 for x in x_test]
+
+    #y_train = [1 if np.linalg.norm(x) > 1 else -1 for x in x_train]
+    #y_test = [1 if np.linalg.norm(x) > 1 else -1 for x in x_test]
     
     print("y_test:")
     print(y_test)

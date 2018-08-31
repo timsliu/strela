@@ -27,6 +27,7 @@
 #                        + 1 to ensure consistent indexing
 # 08/13/18    Tim Liu    commented out special x_l case for final layer
 # 08/22/18    Tim Liu    modified x_l matrix so final layer has 0th index output
+# 08/23/18    Tim Liu    eliminated biase term in all layers
 
 import numpy as np
 
@@ -98,8 +99,10 @@ class strela_net():
 
             
         # set up the xl bias terms
-        for l in range(self.total_layers):
-            self.x_l[l][0][0] = 1
+        #for l in range(self.total_layers):
+        	# changed to zero to see what happens w/o bias term
+        # set bias at zeroth layer
+        self.x_l[0][0][0] = 1
                     
         return
     
