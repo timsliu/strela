@@ -27,10 +27,7 @@
 #                        + 1 to ensure consistent indexing
 # 08/13/18    Tim Liu    commented out special x_l case for final layer
 # 08/22/18    Tim Liu    modified x_l matrix so final layer has 0th index output
-# 08/23/18    Tim Liu    eliminated bias term in all layers
-# 08/23/18    Tim Liu    restored bias term in first layer; no bias in other layers
-# 09/03/18    Tim Liu    unused 0th terms for biases removed from arrays
-#                        removed debugging print statements
+# 08/23/18    Tim Liu    eliminated biase term in all layers
 
 import numpy as np
 
@@ -41,7 +38,7 @@ class strela_net():
         '''initializes the neural net. Creates a matrix for the weights
         and randomly initializes them
         inputs: inputs - number of inputs to the net
-                outputs - number of output heads from the net
+                outputs - number of output heads to the net
                 h_layers - number of hidden layers
                 h_layers_d - dimension of each hidden layer
         outputs: none'''
@@ -59,57 +56,57 @@ class strela_net():
         self.n_outputs = outputs     # no. output heads
         self.h_layers = h_layers     # no. hidden layers
         self.h_layers_d = h_layers_d # no. nodes/layer (excluding zeroth coor)
-        self.total_layers = h_layers + 1  # index of last layer
+        self.total_layers = h_layers + 1
         
         # arrays describing shape of the neural net
         # total number of layers (L) is no. hidden layers + 1 input layer + 
-        # 1 output layer; 1 added to total layers to include 0 indexed
-        # input "layer"
+        # 1 output layer; weight indexing starts at 1 so the 0th layer
+        # is unoccupied, necessitating adding 3 rather than 2
         
         # inputs to each layer - init all to dimension of hidden layers
         self.i_l = [self.h_layers_d for i in range(self.total_layers + 1)] 
-        # outputs from each layer - init all to dimension of hidden layers
-        self.j_l = [self.h_layers_d for j in range(self.total_layers + 1)]
-
+        # outputs to each layer - init all to dimension of hidden layers
+        self.j_l = [self.h_layers_d for j in range(self.total_layers + 1)] 
+        
         # fill in the special cases
-        self.i_l[0] = self.n_inputs + 1              # first input has bias term
-        self.j_l[0] = 0                              # output indexing starts at 1
-        self.j_l[self.total_layers] = self.n_outputs # output layer
+        self.i_l[0] = self.n_inputs      # layer indexing starts at 1
+        self.j_l[0] = 0
+        self.j_l[self.total_layers] = self.n_outputs    # last output layer takes n_outputs
 
         
         # set up the weights, delta, and x arrays to be the correct shape
         for l in range(self.total_layers + 1):
-
-            # randomly initialize weights - weight indexing starts at 1
+            # randomly initialize the weights
             self.weights.append\
-            (0.01 * (np.random.rand(self.i_l[l-1], self.j_l[l]) - 0.5))
-
+                (0.01 * (np.random.rand(self.i_l[l-1] + 1, self.j_l[l] + 1) - 0.5))
+            # + 1 term is for the input 1 term at each layer
+            
             # set up the dimensions of the x outputs
             if l == 0:
                 # "output" of zeroeth layer is the x point being trained on
                 self.x_l.append(np.zeros((self.n_inputs + 1, 1)))
             elif l == self.total_layers:
-            	# nodes in final layer (nuber of output heads)
-                self.x_l.append(np.zeros((self.n_outputs, 1)))
+                self.x_l.append(np.zeros((self.n_outputs + 1, 1)))
             else:
-            	# nodes in the hidden layers
-                self.x_l.append(np.zeros((self.h_layers_d, 1)))
+                self.x_l.append(np.zeros((self.h_layers_d + 1, 1)))
                 
             # set up dimensions of delta
-            self.delta_l.append(np.zeros((self.j_l[l], 1)))
+            self.delta_l.append(np.zeros((self.j_l[l] + 1, 1)))
 
-        # TODO write some info about initialization
-        print("\nlayer:", l)
+            print("\nlayer:", l)
+            print("delta: ", np.shape(self.delta_l[l]))
+            print("weights ", np.shape(self.weights[l]))
 
-        # set up the x0 bias term in the zeroth layer
+            
+        # set up the xl bias terms
+        #for l in range(self.total_layers):
+        	# changed to zero to see what happens w/o bias term
+        # set bias at zeroth layer
         self.x_l[0][0][0] = 1
-
-        print("Strela Net initialized:")
-        print("%d inputs, %d outputs" %(inputs, outputs))
-        print("%d hidden layers, %d nodes per hidden layer"\
-         %(h_layers, h_layers_d))
                     
         return
+    
+
     
     def train(self, x_all, y_all):
         '''trains the neural net using stochastic gradient descent
@@ -120,31 +117,43 @@ class strela_net():
         order = np.arange(len(x_all))
         # array is an array of indexes in random order    
         np.random.shuffle(order)
-        # train on the points in a random order
-        points_trained = 0
+        # train on the points in a random order    
         for n in order:
             # generate the prediction; pass 2D array and get back 2D array;
             # pull the zeroth element of return to have 1D array prediction
+            print("\n\nTest point: ", n, "  ", x_all[n], y_all[n])
+            print("initial x_l:")
+            print(self.x_l)
             y_pre = self.predict([x_all[n]])[0]
+            print("updated x_l:")
+            print(self.x_l)
             # calculate the sigma of the last layer - layer L
+            print("Before Predicted: ", y_pre, "  Actual: ", y_all[n])
+            print("Squared error: ", (y_pre - y_all[n])**2)
             # check this step
-            self.delta_l[self.total_layers] = np.array([2 * (1 - y_pre**2) * (y_pre - y_all[n])])
+            final_delta = np.array([2 * (1 - y_pre**2) * (y_pre - y_all[n])])
+            self.delta_l[self.total_layers] = np.concatenate((np.array([[0]]), final_delta), axis = 0)
+            print(self.delta_l[self.total_layers])
 
             # go backwards in L and calculate the deltas
             for l in reversed(range(2, self.total_layers + 1)):
                 # back-propagate the deltas
-                self.delta_l[l-1] = (1 - np.array(self.x_l[l-1])**2) * \
-                                    np.dot(self.weights[l], self.delta_l[l])
+                self.delta_l[l-1][1:] = (1 - np.array(self.x_l[l-1])**2)[1:] * \
+                                    np.dot(self.weights[l], self.delta_l[l])[1:]
+            print("Delta:")
+            print(self.delta_l)
             # now update the weights
+            print("previous weights:")
+            self.show_weights()
             for l in range(1, self.total_layers + 1):
                 # update weights of each layer
                 self.weights[l] -=\
                     self.lr * np.dot(self.x_l[l-1], np.transpose(self.delta_l[l]))
+            print("updated weights:")
+            self.show_weights()
             y_pre = self.predict([x_all[n]])[0]
-
-            points_trained += 1
-            if points_trained % 100 == 0:
-            	print(points_trained, " points trained")
+            print("After: ", y_pre)
+            print("Squared error: ", (y_pre - y_all[n])**2)
 
         return
     
@@ -160,15 +169,28 @@ class strela_net():
         for n in range(len(x_all)):
             # reshape the input into a 2D n x 1 array
             self.x_l[0][1:] = np.array(x_all[n]).reshape(self.n_inputs, 1)
-            for l in range(1, self.total_layers + 1):            
+            for l in range(1, self.total_layers + 1):
+
+                
                 # mutliply weights by x of previous layer to get intermediate s
                 s_j = np.transpose(np.dot(np.transpose(self.x_l[l-1]), self.weights[l]))
-                # apply activation to get x_l               
-                self.x_l[l] = self.activation(s_j)
+                
+                # special case - final layer x_l is simply post activation
+                # should be able to remove this special case
+                #if l == self.total_layers:
+                #    self.x_l[l] = self.activation(s_j)[1:]
+                # all other layers - don't overwrite 1
+                #else:
+                    # apply the activation and get the result
+                self.x_l[l][1:] = self.activation(s_j)[1:]
+                # print("layer index: ", l)
             # prediction is the output of the final layer
-            # reshape to be one dimensional array
-            y_pre[n] = (self.x_l[self.total_layers]).reshape(self.n_outputs,)
-        # return array of predictions
+            # print(self.x_l[self.total_layers])
+            # reshape to be one dimensional array; zeroeth term is not applicable
+            print(self.x_l)
+            y_pre[n] = (self.x_l[self.total_layers]).reshape(self.n_outputs + 1,)[1:]
+
+        
         return y_pre
     
     def activation(self, s):
@@ -192,7 +214,7 @@ class strela_net():
         
     def show_weights(self):
         '''prints the weights of the neural net in pretty form'''
-        for l in range(1, self.total_layers + 1):
+        for l in range(self.total_layers + 1):
             print("Layer: ", l)
             print(self.weights[l])
         

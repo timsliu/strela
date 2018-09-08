@@ -14,6 +14,7 @@ import numpy as np
 # allow for reloading without closing terminal
 import imp
 import strela_test
+import matplotlib.pyplot as plt
 
 def test_predict(n_in, n_out, h_layers = 3, h_layers_d = 5):
     '''simple test for the predict method of strela_net. Creates an instance
@@ -46,20 +47,16 @@ def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
     This function tests a linearly separable dataset with a single y
     coordinate'''
     
-    n_input = 5         # dimensionality of the space
-    train_size = 300   # size of the training set
-    test_size = 30     # size of the test set
+    n_input = 2         # dimensionality of the space
+    train_size = 500   # size of the training set
+    test_size = 100     # size of the test set
     
     # generate random x values
     x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
     x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
-    # generate y values; hyperplane separating points is sum of coefficients
-    # equalling 1
-    y_train = [1 if sum(x) > -1 else -1 for x in x_train]
-    y_test = [1 if sum(x) > -1 else -1 for x in x_test]
-
-    #y_train = [1 if np.linalg.norm(x) > 1 else -1 for x in x_train]
-    #y_test = [1 if np.linalg.norm(x) > 1 else -1 for x in x_test]
+    # generate y values 
+    y_train = [1 if x[0] + x[1] ** 2 > 2 else -1 for x in x_train]
+    y_test = [1 if x[0] + x[1] ** 2 > 2 else -1 for x in x_test]
     
     print("y_test:")
     print(y_test)
@@ -70,13 +67,12 @@ def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
     my_strela.train(x_train, y_train)
     
     # predict the test set
+    print("Generating predictions on test set...")
     y_pre_raw = my_strela.predict(x_test)
-    print("Predictions:")
-    print(y_pre_raw)
+    #print(y_pre_raw)
     # apply floor function to test set
+    print("Applying floor function...")
     y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
-    print("y_predicted:")
-    print(y_pre)
     
     # check if predictions match actual values
     correct = 0
@@ -85,10 +81,57 @@ def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
             correct += 1
             
     print("Fraction correctly classified: ", correct/test_size)
+
+
+    return 
+
+
+def train_plot(h_layers = 1, h_layers_d = 5, lr = 0.01):
+    '''plots the classification done by the neural net along with the
+    actual function in two dimensions'''
     
-    #my_strela.show_weights()
-    #print(my_strela.x_l)
+    n_input = 2         # dimensionality of the space
+    train_size = 500   # size of the training set
+    test_size = 100     # size of the test set
     
+    # generate random x values
+    x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
+    x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
+    # generate y values 
+    y_train = [1 if x[1] ** 2 - x[0] > 0 else -1 for x in x_train]
+    y_test = [1 if x[1] ** 2 - x[0] > 0 else -1 for x in x_test]
+    
+    print("y_test:")
+    print(y_test)
+    
+    # create instance of strela net
+    my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr)
+    # train the net
+    my_strela.train(x_train, y_train)
+    
+    # predict the test set
+    print("Generating predictions on test set...")
+    y_pre_raw = my_strela.predict(x_train)
+    #print(y_pre_raw)
+    # apply floor function to test set
+    print("Applying floor function...")
+    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
+    
+    # check if predictions match actual values
+    correct = 0
+    for i in range(test_size):
+        if y_pre[i] == y_train[i]:
+            correct += 1
+            
+    print("Fraction correctly classified: ", correct/test_size)  
+
+    c = ['red' if x == 1 else 'blue' for x in y_pre]
+    x_line = np.arange(-5, 5, 0.1)
+    y_line = [x ** 2 for x in x_line]
+
+    plt.scatter([x[0] for x in x_train], [x[1] for x in x_train], color = c) 
+    plt.plot(x_line, y_line)
+    plt.show()  
     return 
 
 def test_simple(lr = 0.1):
@@ -132,6 +175,8 @@ def test_simple(lr = 0.1):
     for i in range(test_size):
         if y_pre[i] == y_test[i]:
             correct += 1
+    print("Predictions:")
+    print(y_pre)
             
     print("Fraction correctly classified: ", correct/test_size)
     
