@@ -91,15 +91,15 @@ def train_plot(h_layers = 1, h_layers_d = 5, lr = 0.01):
     actual function in two dimensions'''
     
     n_input = 2         # dimensionality of the space
-    train_size = 500   # size of the training set
+    train_size = 1000   # size of the training set
     test_size = 100     # size of the test set
     
     # generate random x values
-    x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
-    x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
+    x_train = 5 * (np.random.rand(train_size, n_input))
+    x_test = 5 * (np.random.rand(test_size, n_input))    
     # generate y values 
-    y_train = [1 if x[1] ** 2 - x[0] > 0 else -1 for x in x_train]
-    y_test = [1 if x[1] ** 2 - x[0] > 0 else -1 for x in x_test]
+    y_train = [1 if x[1]**2 + x[0]**2 > 9 else 0 for x in x_train]
+    y_test = [1 if x[1]**2 + x[0]**2 > 9 else 0 for x in x_test]
     
     print("y_test:")
     print(y_test)
@@ -112,26 +112,34 @@ def train_plot(h_layers = 1, h_layers_d = 5, lr = 0.01):
     # predict the test set
     print("Generating predictions on test set...")
     y_pre_raw = my_strela.predict(x_train)
-    #print(y_pre_raw)
+    print(y_pre_raw)
     # apply floor function to test set
     print("Applying floor function...")
-    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
+    y_pre = [1 if x[0] > 0.5 else 0 for x in y_pre_raw]
     
     # check if predictions match actual values
     correct = 0
-    for i in range(test_size):
+    for i in range(train_size):
         if y_pre[i] == y_train[i]:
             correct += 1
             
-    print("Fraction correctly classified: ", correct/test_size)  
+    print("Fraction correctly classified: ", correct/train_size)  
+    print("Number correctly classified: ", correct)  
+
 
     c = ['red' if x == 1 else 'blue' for x in y_pre]
-    x_line = np.arange(-5, 5, 0.1)
-    y_line = [x ** 2 for x in x_line]
+    t = ['red' if x == 1 else 'blue' for x in y_train]
+    x_line = np.arange(0, 3, 0.1)
+    y_line = [(9-x**2) ** 0.5 for x in x_line]
 
     plt.scatter([x[0] for x in x_train], [x[1] for x in x_train], color = c) 
+    #plt.scatter([x[0] for x in x_train], [x[1] for x in x_train], color = t) 
     plt.plot(x_line, y_line)
-    plt.show()  
+    plt.ylim(0, 5)
+    plt.xlim(0, 5)
+    plt.show() 
+    
+    my_strela.show_weights()
     return 
 
 def test_simple(lr = 0.1):

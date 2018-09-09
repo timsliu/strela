@@ -111,40 +111,42 @@ class strela_net():
                     
         return
     
-    def train(self, x_all, y_all):
+    def train(self, x_all, y_all, passes = 10):
         '''trains the neural net using stochastic gradient descent
         inputs: x_all - 2d list like object of all x inputs 
                 y_all - 2d array of correct classifications
         outputs: none'''
         
-        order = np.arange(len(x_all))
-        # array is an array of indexes in random order    
-        np.random.shuffle(order)
-        # train on the points in a random order
-        points_trained = 0
-        for n in order:
-            # generate the prediction; pass 2D array and get back 2D array;
-            # pull the zeroth element of return to have 1D array prediction
-            y_pre = self.predict([x_all[n]])[0]
-            # calculate the sigma of the last layer - layer L
-            # check this step
-            self.delta_l[self.total_layers] = np.array([2 * (1 - y_pre**2) * (y_pre - y_all[n])])
+        for i in range(passes):
+            # tweaked to do multiple passes through the data
+            order = np.arange(len(x_all))
+            # array is an array of indexes in random order    
+            np.random.shuffle(order)
+            # train on the points in a random order
+            points_trained = 0
+            for n in order:
+                # generate the prediction; pass 2D array and get back 2D array;
+                # pull the zeroth element of return to have 1D array prediction
+                y_pre = self.predict([x_all[n]])[0]
+                # calculate the sigma of the last layer - layer L
+                # check this step
+                self.delta_l[self.total_layers] = np.array([2 * (1 - y_pre**2) * (y_pre - y_all[n])])
 
-            # go backwards in L and calculate the deltas
-            for l in reversed(range(2, self.total_layers + 1)):
-                # back-propagate the deltas
-                self.delta_l[l-1] = (1 - np.array(self.x_l[l-1])**2) * \
-                                    np.dot(self.weights[l], self.delta_l[l])
-            # now update the weights
-            for l in range(1, self.total_layers + 1):
-                # update weights of each layer
-                self.weights[l] -=\
-                    self.lr * np.dot(self.x_l[l-1], np.transpose(self.delta_l[l]))
-            y_pre = self.predict([x_all[n]])[0]
+                # go backwards in L and calculate the deltas
+                for l in reversed(range(2, self.total_layers + 1)):
+                    # back-propagate the deltas
+                    self.delta_l[l-1] = (1 - np.array(self.x_l[l-1])**2) * \
+                                        np.dot(self.weights[l], self.delta_l[l])
+                # now update the weights
+                for l in range(1, self.total_layers + 1):
+                    # update weights of each layer
+                    self.weights[l] -=\
+                        self.lr * np.dot(self.x_l[l-1], np.transpose(self.delta_l[l]))
+                y_pre = self.predict([x_all[n]])[0]
 
-            points_trained += 1
-            if points_trained % 100 == 0:
-            	print(points_trained, " points trained")
+                points_trained += 1
+                if points_trained % 100 == 0:
+                	print(points_trained, " points trained")
 
         return
     
@@ -170,26 +172,27 @@ class strela_net():
             y_pre[n] = (self.x_l[self.total_layers]).reshape(self.n_outputs,)
         # return array of predictions
         return y_pre
-    
+
     def activation(self, s):
         '''activation function; currently hard-coded as tanh. Recursively 
-        applies the activation function to a np object (array or float)
-        of any shape elementwise. The return value should have the same
-        dimensions as the argument
-        inputs: s - object to apply activation function to
-        outputs: theta - new object with activation applied'''
-        
+         applies the activation function to a np object (array or float)
+         of any shape elementwise. The return value should have the same
+         dimensions as the argument
+         inputs: s - object to apply activation function to
+         outputs: theta - new object with activation applied'''
         theta = []
-        
         # base case - check it's a float/int
         if np.shape(s) == ():
+            # activation changed to ReLu
             return(np.exp(s) - np.exp(-s))/(np.exp(s) + np.exp(-s))
         else:
-            # otherwise iterate through and perform recursive call
+             # otherwise iterate through and perform recursive call
             for x in s:
                 theta.append(self.activation(x))
         return np.array(theta)
-        
+
+
+
     def show_weights(self):
         '''prints the weights of the neural net in pretty form'''
         for l in range(1, self.total_layers + 1):
@@ -197,6 +200,10 @@ class strela_net():
             print(self.weights[l])
         
         return
-    
+
     def save_weights(self):
         '''saves the weights to a text file and a pickle file'''
+
+        return
+
+
