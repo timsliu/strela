@@ -31,6 +31,8 @@
 # 08/23/18    Tim Liu    restored bias term in first layer; no bias in other layers
 # 09/03/18    Tim Liu    unused 0th terms for biases removed from arrays
 #                        removed debugging print statements
+# 09/09/18    Tim Liu    modified train to make multiple passes through data
+# 09/10/18    Tim Liu    added method set_weight
 
 import numpy as np
 
@@ -82,17 +84,17 @@ class strela_net():
 
             # randomly initialize weights - weight indexing starts at 1
             self.weights.append\
-            (0.01 * (np.random.rand(self.i_l[l-1], self.j_l[l]) - 0.5))
+            (0.5 * (np.random.rand(self.i_l[l-1], self.j_l[l]) - 0.5))
 
             # set up the dimensions of the x outputs
             if l == 0:
                 # "output" of zeroeth layer is the x point being trained on
                 self.x_l.append(np.zeros((self.n_inputs + 1, 1)))
             elif l == self.total_layers:
-            	# nodes in final layer (nuber of output heads)
+                # nodes in final layer (nuber of output heads)
                 self.x_l.append(np.zeros((self.n_outputs, 1)))
             else:
-            	# nodes in the hidden layers
+                # nodes in the hidden layers
                 self.x_l.append(np.zeros((self.h_layers_d, 1)))
                 
             # set up dimensions of delta
@@ -111,10 +113,11 @@ class strela_net():
                     
         return
     
-    def train(self, x_all, y_all, passes = 10):
+    def train(self, x_all, y_all, passes = 25):
         '''trains the neural net using stochastic gradient descent
         inputs: x_all - 2d list like object of all x inputs 
                 y_all - 2d array of correct classifications
+                passes - number of passes through data
         outputs: none'''
         
         for i in range(passes):
@@ -146,7 +149,7 @@ class strela_net():
 
                 points_trained += 1
                 if points_trained % 100 == 0:
-                	print(points_trained, " points trained")
+                    print(points_trained, " points trained")
 
         return
     
@@ -183,7 +186,6 @@ class strela_net():
         theta = []
         # base case - check it's a float/int
         if np.shape(s) == ():
-            # activation changed to ReLu
             return(np.exp(s) - np.exp(-s))/(np.exp(s) + np.exp(-s))
         else:
              # otherwise iterate through and perform recursive call
@@ -191,6 +193,23 @@ class strela_net():
                 theta.append(self.activation(x))
         return np.array(theta)
 
+    def set_weights(self, layer, new_weights):
+        '''set the weights of a specific layer. If the passed weights
+        do not match the dimensions of the layer, then an error is
+        printed and weights are not changed
+        inputs: layer - index of the layer to change weights (starts at 1)
+                weights - numpy array of weights'''
+        
+        if layer > self.total_layers:
+            print("Passed layer %d; total layers %d" %(layer, self.total_layers))
+            return
+        # check that dimensions match
+        if np.shape(self.weights[layer]) != np.shape(new_weights):
+            print("Dimension of passed weights do not match!")
+            return
+
+        self.weights[layer] = new_weights
+        return
 
 
     def show_weights(self):

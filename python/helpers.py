@@ -64,3 +64,14 @@ def save_weights(self):
  dimensions as the argument
  inputs: s - object to apply activation function to
  outputs: theta - new object with activation applied'''
+
+
+        print("Passed layer %d; total layers %d" %(layer, self.total_layers))
+        return
+        # check that dimensions match
+        if np.shape(self.weights[layer]) != np.shape(new_weights):
+            print("Dimension of passed weights do not match!")
+            return
+
+        self.weights[layer] = new_weights
+        return

@@ -6,7 +6,9 @@
 #
 # Revision History
 # 07/17/18    Tim Liu    started file and wrote test_predict
-#
+# 09/10/18    Tim Liu    wrote test square to set weights 
+# 09/10/18    Tim Liu    modified train_plot to test a circle
+#                        in two dimensions
 
 
 from strela import strela_net
@@ -92,14 +94,14 @@ def train_plot(h_layers = 1, h_layers_d = 5, lr = 0.01):
     
     n_input = 2         # dimensionality of the space
     train_size = 1000   # size of the training set
-    test_size = 100     # size of the test set
+    test_size = 1000     # size of the test set
     
     # generate random x values
-    x_train = 5 * (np.random.rand(train_size, n_input))
-    x_test = 5 * (np.random.rand(test_size, n_input))    
+    x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
+    x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
     # generate y values 
-    y_train = [1 if x[1]**2 + x[0]**2 > 9 else 0 for x in x_train]
-    y_test = [1 if x[1]**2 + x[0]**2 > 9 else 0 for x in x_test]
+    y_train = [1 if (x[1] + 1)**2 + x[0]**2 > 9 else -1 for x in x_train]
+    y_test = [1 if (x[1] + 1)**2 + x[0]**2 > 9 else -1 for x in x_test]
     
     print("y_test:")
     print(y_test)
@@ -111,36 +113,64 @@ def train_plot(h_layers = 1, h_layers_d = 5, lr = 0.01):
     
     # predict the test set
     print("Generating predictions on test set...")
-    y_pre_raw = my_strela.predict(x_train)
-    print(y_pre_raw)
+    y_pre_raw = my_strela.predict(x_test)
     # apply floor function to test set
     print("Applying floor function...")
-    y_pre = [1 if x[0] > 0.5 else 0 for x in y_pre_raw]
+    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
     
     # check if predictions match actual values
     correct = 0
-    for i in range(train_size):
-        if y_pre[i] == y_train[i]:
+    for i in range(test_size):
+        if y_pre[i] == y_test[i]:
             correct += 1
             
-    print("Fraction correctly classified: ", correct/train_size)  
+    print("Fraction correctly classified: ", correct/test_size)  
     print("Number correctly classified: ", correct)  
 
 
     c = ['red' if x == 1 else 'blue' for x in y_pre]
-    t = ['red' if x == 1 else 'blue' for x in y_train]
-    x_line = np.arange(0, 3, 0.1)
-    y_line = [(9-x**2) ** 0.5 for x in x_line]
+    x_line = np.arange(-3, 3, 0.01)
+    y_line = [(9-x**2) ** 0.5 - 1 for x in x_line]
+    y_line2 = [-(9-x**2) ** 0.5 - 1 for x in x_line]
 
-    plt.scatter([x[0] for x in x_train], [x[1] for x in x_train], color = c) 
-    #plt.scatter([x[0] for x in x_train], [x[1] for x in x_train], color = t) 
-    plt.plot(x_line, y_line)
-    plt.ylim(0, 5)
-    plt.xlim(0, 5)
+    plt.scatter([x[0] for x in x_test], [x[1] for x in x_test], color = c) 
+    plt.plot(x_line, y_line, color = 'green')
+    plt.plot(x_line, y_line2, color = 'green')
+
+    plt.ylim(-5, 5)
+    plt.xlim(-5, 5)
     plt.show() 
     
     my_strela.show_weights()
     return 
+
+def test_square():
+    my_strela = strela_net(2, 1, 0, 0)
+
+    '''test to see if neural net is able to generate non-linear predictions
+    Uses the set weights function to set the weights and then runs predictions
+    and plots the result'''
+
+    # set up a neural net with 2 inputs 1 output and no hidden layer
+    my_strela.set_weights(1, [[-1.5], [1], [1]])
+
+    x_train = []
+
+    n_input = 2         # dimensionality of the space
+    train_size = 1000   # size of the training set
+    # generate random x values
+    x_train = 5 * (np.random.rand(train_size, n_input))
+    # generate y values 
+    y_pre_raw = my_strela.predict(x_train)
+    # apply floor function to test set
+    print("Applying floor function...")
+    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
+    c = ['red' if x == 1 else 'blue' for x in y_pre]
+
+    plt.scatter([x[0] for x in x_train], [x[1] for x in x_train], color = c)
+    plt.show()
+    return
+
 
 def test_simple(lr = 0.1):
     '''hard coded version of test_train. Instead of a randomly generated
