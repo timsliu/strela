@@ -33,17 +33,13 @@
 #                        removed debugging print statements
 # 09/09/18    Tim Liu    modified train to make multiple passes through data
 # 09/10/18    Tim Liu    added method set_weight
-# 09/19/18    Tim Liu    added methods self.act and self.loss to strela_net
-#                        allowing for different activation and loss functions
 
 import numpy as np
-import strela_helpers
 
 class strela_net():
     '''this class is a neural net that can be used for classifcation and
        prediction. The class does not inherit from a superclass'''
-    def __init__(self, inputs, outputs, h_layers, h_layers_d, \
-        lr = 0.01, loss = "squared", act = "tanh", reg = 0, softmax = False):
+    def __init__(self, inputs, outputs, h_layers, h_layers_d, lr = 0.01):
         '''initializes the neural net. Creates a matrix for the weights
         and randomly initializes them
         inputs: inputs - number of inputs to the net
@@ -52,25 +48,9 @@ class strela_net():
                 h_layers_d - dimension of each hidden layer
 
         outputs: none'''
-
-        # list of activations and losses currently supported
-        self.supported_act = ["tanh"]
-        self.supported_loss = ["squared"]
-
-        # check that loss and activation functions are recognized
-        if loss not in self.supported_loss:
-            print("Loss function not recognized; must be in: ")
-            print(self.supported_loss)
-            return
-        if act not in self.supported_act:
-            print("Activation function not recognized; must be in: ")
-            print(self.supported_act)
-            return
         
         # learning parameters
-        self.lr = lr               # learning rate
-        self.reg = reg             # regularization - currently not supported
-        self.softmax = softmax # apply softmax
+        self.lr = lr      # learning rate        
         
         # parameters that change during training
         self.weights = [] # current weights
@@ -78,8 +58,8 @@ class strela_net():
         self.x_l = []     # 2d array of the x at each step
 
         # parameters for loss function and activation
-        self.act = act    # activation function
-        self.loss = loss  # loss function
+        self.activation = "todo"    # activation function
+        self.loss = "todo"          # loss function
         
         # parameters describing shape of the neural net
         self.n_inputs = inputs       # no. inputs (excludes x0 = 1)
@@ -136,23 +116,22 @@ class strela_net():
                     
         return
     
-    def train(self, x_all, y_all, epochs = 25):
+    def train(self, x_all, y_all, passes = 25):
         '''trains the neural net using stochastic gradient descent
         inputs: x_all - 2d list like object of all x inputs 
                 y_all - 2d array of correct classifications
-                epochs - number of passes through data
+                passes - number of passes through data
         outputs: none'''
 
-        # convert x and y to 2D np arrays
-        x_all = strela_helpers.make_2d(x_all)  
-        y_all = strela_helpers.make_2d(y_all)
+        x_all = np.array(x_all)        # convert x and y to numpy arrays
+        y_all = np.array(y_all)
 
         # total number of points to train on
         total_train = len(x_all) * passes
         # number of points trained on so far
         current_train = 0
         
-        for i in range(epochs):
+        for i in range(passes):
             # perform multiple passes through the data
             order = np.arange(len(x_all))
             # array of indexes in random order - used for SGD   
@@ -160,14 +139,16 @@ class strela_net():
             # train on the points in a random order
             for n in order:
                 # generate the prediction; pass 2D array and get back 2D array;
-                y_pre = self.predict([x_all[n]])
+                # pull the zeroth element of return to have 1D array prediction
+                y_pre = self.predict([x_all[n]])[0]
                 # calculate the sigma of the last layer - layer L
-                self.delta_l[self.total_layers] = self.dx_ds(y_pre) * self.de_dx(y_pre, y_all[n])
+                # wrap in brackets and convert to np array to make 2D array
+                self.delta_l[self.total_layers] = np.array([2 * (1 - y_pre**2) * (y_pre - y_all[n])])
 
                 # go backwards in L and calculate the deltas
                 for l in reversed(range(2, self.total_layers + 1)):
                     # back-propagate the deltas
-                    self.delta_l[l-1] = self.dx_ds(self.x_l[l-1]) * \
+                    self.delta_l[l-1] = (1 - np.array(self.x_l[l-1])**2) * \
                                         np.dot(self.weights[l], self.delta_l[l])
                 # now update the weights
                 for l in range(1, self.total_layers + 1):
@@ -192,7 +173,7 @@ class strela_net():
         
         for n in range(len(x_all)):
             # reshape the input into a 2D n x 1 array
-            self.x_l[0][1:] = strela_helpers.make_2d(x_all[n])
+            self.x_l[0][1:] = np.array(x_all[n]).reshape(self.n_inputs, 1)
             for l in range(1, self.total_layers + 1):            
                 # mutliply weights by x of previous layer to get intermediate s
                 s_j = np.transpose(np.dot(np.transpose(self.x_l[l-1]), self.weights[l]))
@@ -201,14 +182,11 @@ class strela_net():
             # prediction is the output of the final layer
             # reshape to be one dimensional array
             y_pre[n] = (self.x_l[self.total_layers]).reshape(self.n_outputs,)
-            # apply softmax if set to do so
-            if self.softmax:
-                y_pre[n] = strela_helpers.apply_softmax(y_pre[n])
         # return array of predictions
         return y_pre
 
     def activation(self, s):
-        '''activation function. Recursively 
+        '''activation function; currently hard-coded as tanh. Recursively 
          applies the activation function to a np object (array or float)
          of any shape elementwise. The return value should have the same
          dimensions as the argument
@@ -217,47 +195,12 @@ class strela_net():
         theta = []
         # base case - check it's a float/int
         if np.shape(s) == ():
-            # implementation of different activation functions
-            if self.act == "tanh":
-                return(np.exp(s) - np.exp(-s))/(np.exp(s) + np.exp(-s))
-
+            return(np.exp(s) - np.exp(-s))/(np.exp(s) + np.exp(-s))
         else:
              # otherwise iterate through and perform recursive call
             for x in s:
                 theta.append(self.activation(x))
         return np.array(theta)
-
-    def de_dx(self, y_pre, y_n):
-        '''returns the derivative de over dx, the derivative of the 
-        error function with respect to x.
-        inputs: y_pre - predicted y value
-                y_n - true y value'''
-
-
-        # de over dx for different loss functions
-        if self.loss == "squared":
-            # de/dx of squared loss: e = (y-yn) ** 2
-            de_dx = 2 * (y_pre - y_n)
-        if self.loss == "cce":
-            # de/dx of cross-entropy: -(ynlog(y) + (1-yn)log(1-y))
-            de_dx = []
-            for i in range(len(y_pre)):
-                de_dx.append(-1 * y_n[i]/y_pre[i] + (1-y_n[i])/(1-y_pre[i]))
-
-        return strela_helpers.make_2d(de_dx)
-
-    def dx_ds(self, x_l):
-        '''calculates the derivative dx over ds, equivalent to the
-        derivative of the activation function w/ respect to the
-        input s
-        inputs: x_l - output of activation for a given layer'''
-
-        # dx over ds for different activation functions
-        if self.act == "tanh":
-            # derivative of tanh activation function
-            dx_ds = (1 - x_l**2)
-
-        return strela_helpers.make_2d(dx_ds)
 
     def set_weights(self, layer, new_weights):
         '''set the weights of a specific layer. If the passed weights
@@ -276,10 +219,6 @@ class strela_net():
 
         self.weights[layer] = new_weights
         return
-
-    def check_inputs(self):
-        '''error checking function that checks if the combination of inputs
-        to the neural net are allowed'''
 
 
     def show_weights(self):
