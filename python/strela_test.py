@@ -18,6 +18,7 @@ import numpy as np
 import imp
 import strela_test
 import matplotlib.pyplot as plt
+import strela_helpers as sh
 
 def test_predict(n_in, n_out, h_layers = 3, h_layers_d = 5):
     '''simple test for the predict method of strela_net. Creates an instance
@@ -113,9 +114,12 @@ def test_multiclass(h_layers = 1, h_layers_d = 5, lr = 0.01):
     # predict the test set
     print("Generating predictions on test set...")
     y_pre_raw = my_strela.predict(x_test)
-    # apply floor function to test set
-    print("Applying floor function...")
-    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
+    
+    print("Applying one hot encoding...")
+    y_pre = []
+    for prediction in y_pre:
+    	y_pre.append(sh.convert_one_hot(prediction))
+
     
     # check if predictions match actual values
     correct = 0

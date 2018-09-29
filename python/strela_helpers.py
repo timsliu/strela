@@ -49,7 +49,21 @@ def convert_one_hot(in_array):
 	a one hot encoding. The largest value in the array is set as 1 and
 	all other elements are 0. Used for multiclass classification'''
 
-	return
+	largest_index = 0
+	largest = -np.inf
+
+    # search for largest value
+	for i in range(len(in_array)):
+		if in_array[i] > largest:
+			largest_index = i
+			largest = in_array[i]
+
+    # create array of zeros
+	one_hot = np.zeros(len(in_array))
+    # one hot encode it
+	one_hot[largest_index] = 1
+
+	return one_hot
 
 def convert_binary(in_array):
 	'''applies step function to an (n, 1) array; values over 0 are set to
