@@ -10,6 +10,7 @@
 # 09/10/18    Tim Liu    modified train_plot to test a circle
 #                        in two dimensions
 # 09/17/18    Tim Liu    removed test_square and updated comments
+# 09/28/18    Tim Liu    wrote test_erf for testing different error functions
 
 
 from strela import strela_net
@@ -43,7 +44,7 @@ def test_predict(n_in, n_out, h_layers = 3, h_layers_d = 5):
     return
 
 def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
-    '''stimple test of strela net training. Randomly generates points in a 
+    '''simple test of strela net training. Randomly generates points in a 
     multi-dimensional space and trains the net on them. Then evaluates on
     a separate test set. The training set has multiple x inputs and
     a single y
@@ -87,6 +88,52 @@ def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
 
     return
 
+def test_erf(h_layers = 1, h_layers_d = 5, lr = 0.01):
+    '''tests different error functions and output adjustments for
+    simple binary classifications. Currently written to test
+    multi-class setup on binary classification problem'''
+    
+    n_input = 4         # dimensionality of the space
+    train_size = 500   # size of the training set
+    test_size = 100     # size of the test set
+    
+    # generate random x values
+    x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
+    x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
+    # generate y values
+    y_train = tag_multiclass(x_train, 2)
+    y_test = tag_multiclass(x_test, 2)
+    
+    
+    # create instance of strela net
+    my_strela = strela_net(n_input, 2, h_layers, h_layers_d, lr, softmax = True, loss = "squared")
+    # train the net
+    my_strela.train(x_train, y_train)
+    
+    # predict the test set
+    print("Generating predictions on test set...")
+    y_pre_raw = my_strela.predict(x_test)
+    
+    print("Applying one hot encoding...")
+    y_pre = []
+    for prediction in y_pre_raw:
+        y_pre.append(sh.convert_one_hot(prediction))
+
+    print(y_pre)
+    print(y_test)
+
+    
+    # check if predictions match actual values
+    correct = 0
+    for i in range(test_size):
+        if np.array_equal(y_pre[i], y_test[i]):
+            correct += 1
+            
+    print("Fraction correctly classified: ", correct/test_size)
+
+
+    return
+
 def test_multiclass(h_layers = 1, h_layers_d = 5, lr = 0.01):
     '''test of multiclass classification.
     inputs: h_layers - number of hidden layers
@@ -102,12 +149,13 @@ def test_multiclass(h_layers = 1, h_layers_d = 5, lr = 0.01):
     x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
     x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
     # use helper function to create y_values
-    y_train = tag_multiclass(x_train)
-    y_test = tag_multiclass(x_test)
+    y_train = tag_multiclass(x_train, n_output)
+    y_test = tag_multiclass(x_test, n_output)
     
     
     # create instance of strela net; apply softmax and use categorical cross entropy
-    my_strela = strela_net(n_input, 3, h_layers, h_layers_d, lr, softmax = True, loss = "cce")
+    my_strela = strela_net(n_input, n_output, h_layers, h_layers_d, lr,\
+     softmax = True, loss = "cce")
     # train the net
     my_strela.train(x_train, y_train)
     
@@ -117,44 +165,50 @@ def test_multiclass(h_layers = 1, h_layers_d = 5, lr = 0.01):
     
     print("Applying one hot encoding...")
     y_pre = []
-    for prediction in y_pre:
-    	y_pre.append(sh.convert_one_hot(prediction))
+    for prediction in y_pre_raw:
+        y_pre.append(sh.convert_one_hot(prediction))
+
+    print(y_pre)
+    print(y_test)
 
     
     # check if predictions match actual values
     correct = 0
     for i in range(test_size):
-        if y_pre[i] == y_test[i]:
+        if np.array_equal(y_pre[i], y_test[i]):
             correct += 1
             
     print("Fraction correctly classified: ", correct/test_size)
 
     return
 
-def tag_multiclass(x_all):
-	'''helper function for tagging a multiclass dataset
-	inputs: x_all - x array to tag
-	outputs: y_all - one hot encoded tags'''
+def tag_multiclass(x_all, classes):
+    '''helper function for tagging a multiclass dataset
+    inputs: x_all - x array to tag
+            classes - number of categories
+    outputs: y_all - one hot encoded tags'''
 
     # array of one hot encoded y classifications
-	y_all = np.zeros((len(x_all), 3))
+    y_all = np.zeros((len(x_all), classes))
+    # list of the indices to set to 1
+    tags = []
 
-	for x in x_all:
-		# classify the points
-		if x[0] + 2 * x[1] < 2 and x[0] > 0:
-			# group 0
-			tags.append(0)
-		elif x[0] ** 2 - x[1] > 1:
-			# group 1
-			tags.append(1)
-		else:
-			tags.append(2)
+    for x in x_all:
+        # classify the points
+        if (x[0] + 2 * x[1] < 2) and (x[0] > 0):
+            # group 0
+            tags.append(0)
+        elif x[0] ** 2 - x[1] > 1:
+            # group 1
+            tags.append(1)
+        else:
+            tags.append(2)
 
-	for t in range(len(tags)):
-		# create one hot encoding
-		y_all[t][tags[t]] = 1
+    for t in range(len(tags)):
+        # create one hot encoding
+        y_all[t][tags[t]] = 1
 
-	return y_all
+    return y_all
 
 def train_plot(h_layers = 1, h_layers_d = 5, lr = 0.01):
     '''plots the classification done by the neural net along with the
@@ -175,8 +229,7 @@ def train_plot(h_layers = 1, h_layers_d = 5, lr = 0.01):
     y_train = [1 if (x[1] + 1)**2 + x[0]**2 > 9 else -1 for x in x_train]
     y_test = [1 if (x[1] + 1)**2 + x[0]**2 > 9 else -1 for x in x_test]
     
-    #print("y_test:")
-    #print(y_test)
+
     
     # create instance of strela net
     my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr)
@@ -266,3 +319,70 @@ def test_simple(lr = 0.1):
     print("Fraction correctly classified: ", correct/test_size)
     
     return
+
+def test_reg(h_layers = 2, h_layers_d = 10, lr = 0.01):
+    '''test of regularization. The training set and test set
+    are drawn from the same function but the training set has
+    incorrectly labeled points thrown in'''
+
+    n_input = 2          # dimensionality of the space
+    train_size = 1000    # size of the training set
+    test_size = 1000     # size of the test set
+    
+    # generate random x values
+    x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
+    x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
+    # generate y values 
+    y_train = [1 if x[1] + x[0]**2 > 9 else -1 for x in x_train]
+    y_test = [1 if x[1] + x[0]**2 > 9 else -1 for x in x_test]
+    # now randomly flip some of the training set values
+    flip = np.random.random_integers(0, train_size-1, round(train_size/10))
+
+    for i in flip:
+        # flip some of the training set labels; some may get flipped
+        # more than once
+        y_train[i] *= -1
+
+    regs = [0, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1]   # list of regularization levels to test
+    in_sample_error = []
+    out_sample_error = []
+
+    for l in regs:
+        # create instance of strela net
+        my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr, reg = l)
+        # train the net
+        my_strela.train(x_train, y_train)
+
+        # in sample performance - predict the training set
+        y_pre_raw = my_strela.predict(x_train)
+        # apply floor function to test set
+        y_pre = sh.convert_binary(y_pre_raw)   
+        # check if predictions match actual values
+        correct = 0
+        for i in range(train_size):
+            if y_pre[i] == y_train[i]:
+                correct += 1
+        in_sample_error.append(correct/train_size)
+
+
+        # out of sample performance - predict the test set
+        y_pre_raw = my_strela.predict(x_test)
+        # apply floor function to test set
+        y_pre = sh.convert_binary(y_pre_raw)   
+        # check if predictions match actual values
+        correct = 0
+        for i in range(test_size):
+            if y_pre[i] == y_test[i]:
+                correct += 1
+        out_sample_error.append(correct/test_size)
+
+    print("Regularizations: ", regs)
+    print("In sample: ", in_sample_error)
+    print("Out sample: ", out_sample_error)
+
+    return
+
+
+
+
+

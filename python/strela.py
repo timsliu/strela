@@ -35,9 +35,10 @@
 # 09/10/18    Tim Liu    added method set_weight
 # 09/19/18    Tim Liu    added methods self.act and self.loss to strela_net
 #                        allowing for different activation and loss functions
+# 09/29/18    Tim Liu    added l2 regularization term to weight update
 
 import numpy as np
-import strela_helpers
+import strela_helpers as sh
 
 class strela_net():
     '''this class is a neural net that can be used for classifcation and
@@ -53,19 +54,10 @@ class strela_net():
 
         outputs: none'''
 
+    
         # list of activations and losses currently supported
         self.supported_act = ["tanh"]
-        self.supported_loss = ["squared"]
-
-        # check that loss and activation functions are recognized
-        if loss not in self.supported_loss:
-            print("Loss function not recognized; must be in: ")
-            print(self.supported_loss)
-            return
-        if act not in self.supported_act:
-            print("Activation function not recognized; must be in: ")
-            print(self.supported_act)
-            return
+        self.supported_loss = ["squared", "cce"]
         
         # learning parameters
         self.lr = lr               # learning rate
@@ -87,6 +79,11 @@ class strela_net():
         self.h_layers = h_layers     # no. hidden layers
         self.h_layers_d = h_layers_d # no. nodes/layer (excluding zeroth coor)
         self.total_layers = h_layers + 1  # index of last layer
+
+        # check that inputs are valid
+        if self.check_inputs():
+            # inputs not valid - exit without completing init
+            return
         
         # arrays describing shape of the neural net
         # total number of layers (L) is no. hidden layers + 1 input layer + 
@@ -129,10 +126,8 @@ class strela_net():
         self.x_l[0][0][0] = 1
 
         # some info about initialization
-        print("Strela Net initialized:")
-        print("%d inputs, %d outputs" %(inputs, outputs))
-        print("%d hidden layers, %d nodes per hidden layer"\
-         %(h_layers, h_layers_d))
+        print("Strela Net initialized")
+        print(self.__repr__())
                     
         return
     
@@ -144,11 +139,11 @@ class strela_net():
         outputs: none'''
 
         # convert x and y to 2D np arrays
-        x_all = strela_helpers.make_2d(x_all)  
-        y_all = strela_helpers.make_2d(y_all)
+        x_all = sh.make_2d(x_all)  
+        y_all = sh.make_2d(y_all)
 
         # total number of points to train on
-        total_train = len(x_all) * passes
+        total_train = len(x_all) * epochs
         # number of points trained on so far
         current_train = 0
         
@@ -159,10 +154,12 @@ class strela_net():
             np.random.shuffle(order)
             # train on the points in a random order
             for n in order:
-                # generate the prediction; pass 2D array and get back 2D array;
-                y_pre = self.predict([x_all[n]])
+                # generate the prediction; pass 2D array pull off first
+                # element to get 1D array
+                y_pre = self.predict([x_all[n]])[0]
                 # calculate the sigma of the last layer - layer L
-                self.delta_l[self.total_layers] = self.dx_ds(y_pre) * self.de_dx(y_pre, y_all[n])
+                self.delta_l[self.total_layers] = self.dx_ds(y_pre)\
+                 * self.de_dx(y_pre, y_all[n])
 
                 # go backwards in L and calculate the deltas
                 for l in reversed(range(2, self.total_layers + 1)):
@@ -173,7 +170,8 @@ class strela_net():
                 for l in range(1, self.total_layers + 1):
                     # update weights of each layer
                     self.weights[l] -=\
-                        self.lr * np.dot(self.x_l[l-1], np.transpose(self.delta_l[l]))
+                        self.lr * np.dot(self.x_l[l-1], np.transpose(self.delta_l[l])) \
+                        + self.reg * self.weights[l]  # regularization term
                 current_train += 1
                 # change divisor to tune how often progress bar prints out
                 if current_train % (total_train/20) == 0:
@@ -192,18 +190,18 @@ class strela_net():
         
         for n in range(len(x_all)):
             # reshape the input into a 2D n x 1 array
-            self.x_l[0][1:] = strela_helpers.make_2d(x_all[n])
+            self.x_l[0][1:] = sh.make_2d(x_all[n])
             for l in range(1, self.total_layers + 1):            
                 # mutliply weights by x of previous layer to get intermediate s
                 s_j = np.transpose(np.dot(np.transpose(self.x_l[l-1]), self.weights[l]))
                 # apply activation to get x_l               
                 self.x_l[l] = self.activation(s_j)
             # prediction is the output of the final layer
-            # reshape to be one dimensional array
+            # reshape to be one dimensional array output
             y_pre[n] = (self.x_l[self.total_layers]).reshape(self.n_outputs,)
             # apply softmax if set to do so
             if self.softmax:
-                y_pre[n] = strela_helpers.apply_softmax(y_pre[n])
+                y_pre[n] = sh.apply_softmax(y_pre[n])
         # return array of predictions
         return y_pre
 
@@ -240,11 +238,9 @@ class strela_net():
             de_dx = 2 * (y_pre - y_n)
         if self.loss == "cce":
             # de/dx of cross-entropy: -(ynlog(y) + (1-yn)log(1-y))
-            de_dx = []
-            for i in range(len(y_pre)):
-                de_dx.append(-1 * y_n[i]/y_pre[i] + (1-y_n[i])/(1-y_pre[i]))
+            de_dx = -1 * y_n/y_pre + (1-y_n)/(1-y_pre)
 
-        return strela_helpers.make_2d(de_dx)
+        return sh.make_2d(de_dx)
 
     def dx_ds(self, x_l):
         '''calculates the derivative dx over ds, equivalent to the
@@ -257,7 +253,7 @@ class strela_net():
             # derivative of tanh activation function
             dx_ds = (1 - x_l**2)
 
-        return strela_helpers.make_2d(dx_ds)
+        return sh.make_2d(dx_ds)
 
     def set_weights(self, layer, new_weights):
         '''set the weights of a specific layer. If the passed weights
@@ -279,7 +275,21 @@ class strela_net():
 
     def check_inputs(self):
         '''error checking function that checks if the combination of inputs
-        to the neural net are allowed'''
+        to the neural net are allowed. Returns if True if there is an error'''
+
+        error = False  # optimistically assume no error
+
+        # check that loss and activation functions are recognized
+        if self.loss not in self.supported_loss:
+            print("Loss function not recognized; must be in: ")
+            print(self.supported_loss)
+            error = True
+        if self.act not in self.supported_act:
+            print("Activation function not recognized; must be in: ")
+            print(self.supported_act)
+            error = True
+
+        return error
 
 
     def show_weights(self):
@@ -295,5 +305,25 @@ class strela_net():
 
         print("Sorry! This method isn't done yet :(")
         return
+
+    def __repr__(self):
+        '''prints info about the instance of strela'''
+        output_string = 'Instance of strela_net class\n'
+        output_string += "%d inputs, %d outputs\n" %(self.n_inputs, self.n_outputs)
+        output_string += "%d hidden layers, %d nodes per hidden layer\n"\
+        %(self.h_layers, self.h_layers_d)
+        output_string += "Regularization lambda: %f\n" %(self.reg)
+        output_string += "Activation function: %s\n" %(self.act)
+        output_string += "Loss function: %s\n" %(self.loss)
+
+        return output_string
+
+
+
+
+
+
+
+
 
 
