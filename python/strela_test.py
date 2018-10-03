@@ -11,20 +11,19 @@
 #                        in two dimensions
 # 09/17/18    Tim Liu    removed test_square and updated comments
 # 09/28/18    Tim Liu    wrote test_erf for testing different error functions
+# 09/30/18    Tim Liu    removed output encoding from test functions;
+#                        this feature now done by strela_net
 
 
-from strela import strela_net
+from strela import *
 import numpy as np
-# allow for reloading without closing terminal
-import imp
-import strela_test
 import matplotlib.pyplot as plt
-import strela_helpers as sh
 
 def test_predict(n_in, n_out, h_layers = 3, h_layers_d = 5):
     '''simple test for the predict method of strela_net. Creates an instance
     of strela net and randomly creates inputs to generate predictions on.
-    Function tests that the neural net correctly calculates the output;
+    Function tests that the neural net calculates the output and that arrays
+    are aligned;
     does not test the training or back propagation
     inputs: n_in - (int) dimensions of each input point
             n_out - (int) dimensionality of the predicted output
@@ -47,10 +46,7 @@ def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
     '''simple test of strela net training. Randomly generates points in a 
     multi-dimensional space and trains the net on them. Then evaluates on
     a separate test set. The training set has multiple x inputs and
-    a single y
-    
-    This function tests a linearly separable dataset with a single y
-    coordinate'''
+    a single y'''
     
     n_input = 4         # dimensionality of the space
     train_size = 500   # size of the training set
@@ -65,17 +61,13 @@ def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
     
     
     # create instance of strela net
-    my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr)
+    my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr, out_encode = "binary")
     # train the net
     my_strela.train(x_train, y_train)
     
     # predict the test set
     print("Generating predictions on test set...")
-    y_pre_raw = my_strela.predict(x_test)
-    #print(y_pre_raw)
-    # apply floor function to test set
-    print("Applying floor function...")
-    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
+    y_pre = my_strela.predict(x_test)
     
     # check if predictions match actual values
     correct = 0
@@ -88,53 +80,7 @@ def test_train(h_layers = 1, h_layers_d = 5, lr = 0.01):
 
     return
 
-def test_erf(h_layers = 1, h_layers_d = 5, lr = 0.01):
-    '''tests different error functions and output adjustments for
-    simple binary classifications. Currently written to test
-    multi-class setup on binary classification problem'''
-    
-    n_input = 4         # dimensionality of the space
-    train_size = 500   # size of the training set
-    test_size = 100     # size of the test set
-    
-    # generate random x values
-    x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
-    x_test = 10 * (np.random.rand(test_size, n_input) - 0.5)    
-    # generate y values
-    y_train = tag_multiclass(x_train, 2)
-    y_test = tag_multiclass(x_test, 2)
-    
-    
-    # create instance of strela net
-    my_strela = strela_net(n_input, 2, h_layers, h_layers_d, lr, softmax = True, loss = "squared")
-    # train the net
-    my_strela.train(x_train, y_train)
-    
-    # predict the test set
-    print("Generating predictions on test set...")
-    y_pre_raw = my_strela.predict(x_test)
-    
-    print("Applying one hot encoding...")
-    y_pre = []
-    for prediction in y_pre_raw:
-        y_pre.append(sh.convert_one_hot(prediction))
-
-    print(y_pre)
-    print(y_test)
-
-    
-    # check if predictions match actual values
-    correct = 0
-    for i in range(test_size):
-        if np.array_equal(y_pre[i], y_test[i]):
-            correct += 1
-            
-    print("Fraction correctly classified: ", correct/test_size)
-
-
-    return
-
-def test_multiclass(h_layers = 1, h_layers_d = 5, lr = 0.01):
+def test_multiclass(h_layers = 1, h_layers_d = 40, lr = 1e-3):
     '''test of multiclass classification.
     inputs: h_layers - number of hidden layers
             h_layers_d = number of nodes per hidden layer
@@ -143,7 +89,7 @@ def test_multiclass(h_layers = 1, h_layers_d = 5, lr = 0.01):
     n_input = 2         # dimensionality of the space
     n_output = 3        # number of classes
     train_size = 500    # size of the training set
-    test_size = 100     # size of the test set
+    test_size = 500     # size of the test set
     
     # generate random x values
     x_train = 10 * (np.random.rand(train_size, n_input) - 0.5)
@@ -155,23 +101,14 @@ def test_multiclass(h_layers = 1, h_layers_d = 5, lr = 0.01):
     
     # create instance of strela net; apply softmax and use categorical cross entropy
     my_strela = strela_net(n_input, n_output, h_layers, h_layers_d, lr,\
-     softmax = True, loss = "cce")
+     epochs = 25, softmax = True, loss = "squared", out_encode = "one_hot")
     # train the net
     my_strela.train(x_train, y_train)
     
     # predict the test set
     print("Generating predictions on test set...")
-    y_pre_raw = my_strela.predict(x_test)
-    
-    print("Applying one hot encoding...")
-    y_pre = []
-    for prediction in y_pre_raw:
-        y_pre.append(sh.convert_one_hot(prediction))
+    y_pre = my_strela.predict(x_test)
 
-    print(y_pre)
-    print(y_test)
-
-    
     # check if predictions match actual values
     correct = 0
     for i in range(test_size):
@@ -179,6 +116,34 @@ def test_multiclass(h_layers = 1, h_layers_d = 5, lr = 0.01):
             correct += 1
             
     print("Fraction correctly classified: ", correct/test_size)
+
+    # color the predictions
+    color_dic = {0: "red", 1: "green", 2: "blue"}
+    c = [color_dic[list(x).index(1)] for x in y_pre]
+    # draw separating line
+    x_0 = np.arange(0, 5, 0.01)
+    y_0 = [(2-x)/2 for x in x_0]
+
+    x_1 = [0, 0]
+    y_1 = [-5, 1]
+
+    x_2 = np.arange(-5, 0, 0.01)
+    y_2 = [x**2 - 1 for x in x_2]
+
+    x_3 = np.arange(1.2, 5, 0.01)
+    y_3 = [x**2 - 1 for x in x_3]
+
+    # plot the points and the separating line
+    plt.scatter([x[0] for x in x_test], [x[1] for x in x_test], color = c) 
+    plt.plot(x_0, y_0, color = 'black')
+    plt.plot(x_1, y_1, color = 'black')
+    plt.plot(x_2, y_2, color = 'black')
+    plt.plot(x_3, y_3, color = 'black')
+
+
+    plt.ylim(-5, 5)
+    plt.xlim(-5, 5)
+    plt.show() 
 
     return
 
@@ -232,16 +197,13 @@ def train_plot(h_layers = 1, h_layers_d = 5, lr = 0.01):
 
     
     # create instance of strela net
-    my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr)
+    my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr, out_encode = "binary")
     # train the net
     my_strela.train(x_train, y_train)
     
     # predict the test set
     print("Generating predictions on test set...")
-    y_pre_raw = my_strela.predict(x_test)
-    # apply floor function to test set
-    print("Applying floor function...")
-    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
+    y_pre = my_strela.predict(x_test)
     
     # check if predictions match actual values
     correct = 0
@@ -290,31 +252,22 @@ def test_simple(lr = 0.1):
     y_train = [1 if sum(x) > 0 else -1 for x in x_train]
     y_test = [1 if sum(x) > 0 else -1 for x in x_test]
     
-    print("y_test:")
-    print(y_test)
     
     # create instance of strela net
     # 1 input 1 output no hidden layer
-    my_strela = strela_net(1, 1, 1, 5, lr)
+    my_strela = strela_net(1, 1, 1, 5, lr, out_encode = "binary")
     # train the net
     my_strela.train(x_train, y_train)
     
     # predict the test set
-    y_pre_raw = my_strela.predict(x_test)
-    print("Predictions:")
-    print(y_pre_raw)
-    # apply floor function to test set
-    y_pre = [1 if x[0] > 0 else -1 for x in y_pre_raw]
-    print("y_predicted:")
-    print(y_pre)
-    
+    y_pre = my_strela.predict(x_test)
     # check if predictions match actual values
     correct = 0
     for i in range(test_size):
         if y_pre[i] == y_test[i]:
             correct += 1
-    print("Predictions:")
-    print(y_pre)
+    # print("Predictions:")
+    # print(y_pre)
             
     print("Fraction correctly classified: ", correct/test_size)
     
@@ -343,20 +296,18 @@ def test_reg(h_layers = 2, h_layers_d = 10, lr = 0.01):
         # more than once
         y_train[i] *= -1
 
-    regs = [0, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1]   # list of regularization levels to test
+    regs = [0, 1e-8, 1e-6, 1e-4, 1e-2, 1]   # list of regularization levels to test
     in_sample_error = []
     out_sample_error = []
 
     for l in regs:
         # create instance of strela net
-        my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr, reg = l)
+        my_strela = strela_net(n_input, 1, h_layers, h_layers_d, lr, reg = l, out_encode = "binary", epochs = 10)
         # train the net
         my_strela.train(x_train, y_train)
 
         # in sample performance - predict the training set
-        y_pre_raw = my_strela.predict(x_train)
-        # apply floor function to test set
-        y_pre = sh.convert_binary(y_pre_raw)   
+        y_pre = my_strela.predict(x_train)  
         # check if predictions match actual values
         correct = 0
         for i in range(train_size):
@@ -366,9 +317,7 @@ def test_reg(h_layers = 2, h_layers_d = 10, lr = 0.01):
 
 
         # out of sample performance - predict the test set
-        y_pre_raw = my_strela.predict(x_test)
-        # apply floor function to test set
-        y_pre = sh.convert_binary(y_pre_raw)   
+        y_pre = my_strela.predict(x_test)   
         # check if predictions match actual values
         correct = 0
         for i in range(test_size):

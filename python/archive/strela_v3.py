@@ -8,20 +8,6 @@
 # https://en.wikipedia.org/wiki/Strela_computer
 #
 # Table of Contents
-# strela_net - neural net class
-#     __init__ - initializes neural net
-#     train - method for training on data using backpropagation and SGD
-#     predict - generate predictions
-#     activation - activation function
-#     de_dx - calculates derivative of error with respect to prediction
-#     dx_ds - calculates derviative of layer output to act. input
-#     apply_encoding - epply any specified output encoding to predictions
-#     set_weights - manually set weights
-#     check_inputs - checks that the arguments to strela_net are valid
-#     show_weights - print out the weights
-#     __repr__ - print info about the instance
-# strela_help - prints info about arguments to strela_net
-#
 #
 # Revision History
 # 07/14/18    Tim Liu    wrote function and class descriptors
@@ -50,7 +36,6 @@
 # 09/19/18    Tim Liu    added methods self.act and self.loss to strela_net
 #                        allowing for different activation and loss functions
 # 09/29/18    Tim Liu    added l2 regularization term to weight update
-# 10/02/18    Tim Liu    added strela_help function and quiet optional argument
 
 import numpy as np
 import strela_helpers as sh
@@ -59,64 +44,44 @@ class strela_net():
     '''this class is a neural net that can be used for classifcation and
        prediction. The class does not inherit from a superclass'''
     def __init__(self, inputs, outputs, h_layers, h_layers_d, \
-        lr = 1e-3, reg = 0, epochs = 25, \
-        loss = "squared", act = "tanh",  out_encode = "none", softmax = False, 
-        quiet = False):
+        lr = 0.01, loss = "squared", act = "tanh", reg = 0, softmax = False):
         '''initializes the neural net. Creates a matrix for the weights
         and randomly initializes them
-        inputs:
-            inputs     (int) - dimension of input space
-            outputs    (int) - dimension of output space
-            h_layers   (int) - number of hidden layers
-            h_layers_d (int) - number of nodes per hidden layer
+        inputs: inputs - number of inputs to the net
+                outputs - number of output heads from the net
+                h_layers - number of hidden layers
+                h_layers_d - dimension of each hidden layer
 
-            lr         (flt) - learning rate           
-            reg        (flt) - regularization lambda    
-            epochs     (int) - passes through training data
-            loss       (str) - loss function             
-            act        (str) - activation function      
-            out_encode (str) - output encoding               
-            softmax    (bool)- turn on softmax              
-            quiet      (bool)- suppress print statements      
         outputs: none'''
-
+ 
         # list of activations and losses currently supported
         self.supported_act = ["tanh"]
         self.supported_loss = ["squared", "cce"]
-        self.supported_encoding = ["none", "one_hot", "binary"]
+        
+        # learning parameters
+        self.lr = lr               # learning rate
+        self.reg = reg             # regularization - currently not supported
+        self.softmax = softmax # apply softmax
+        
+        # parameters that change during training
+        self.weights = [] # current weights
+        self.delta_l = [] # 2d array of delta from most recent BP
+        self.x_l = []     # 2d array of the x at each step
 
+        # parameters for loss function and activation
+        self.act = act    # activation function
+        self.loss = loss  # loss function
+        
         # parameters describing shape of the neural net
         self.n_inputs = inputs       # no. inputs (excludes x0 = 1)
         self.n_outputs = outputs     # no. output heads
         self.h_layers = h_layers     # no. hidden layers
         self.h_layers_d = h_layers_d # no. nodes/layer (excluding zeroth coor)
         self.total_layers = h_layers + 1  # index of last layer
-        
-        # learning  and training parameters
-        self.lr = lr                 # learning rate
-        self.reg = reg               # regularization
-        self.epochs = epochs         # number of training epochs
 
-        # modifications to output
-        self.softmax = softmax       # apply softmax
-        self.out_encode = out_encode # output encoding on predictions
-        
-        # parameters that change during training
-        self.weights = []            # current weights
-        self.delta_l = []            # 2d array of delta from most recent BP
-        self.x_l = []                # 2d array of the x at each step
-
-        # parameters for loss function and activation
-        self.act = act               # activation function
-        self.loss = loss             # loss function
-
-        # additional parameters
-        self.quiet = quiet           # whether to suppress print statements
-        
         # check that inputs are valid
         if self.check_inputs():
             # inputs not valid - exit without completing init
-            print("\n === WARNING! STRELA_NET NOT PROPERLY INITIALIZED === \n")
             return
         
         # arrays describing shape of the neural net
@@ -160,13 +125,12 @@ class strela_net():
         self.x_l[0][0][0] = 1
 
         # some info about initialization
-        if not self.quiet:
-            print("Strela Net initialized")
-            print(self.__repr__())
+        print("Strela Net initialized")
+        print(self.__repr__())
                     
         return
     
-    def train(self, x_all, y_all):
+    def train(self, x_all, y_all, epochs = 25):
         '''trains the neural net using stochastic gradient descent
         inputs: x_all - 2d list like object of all x inputs 
                 y_all - 2d array of correct classifications
@@ -178,11 +142,11 @@ class strela_net():
         y_all = sh.make_2d(y_all)
 
         # total number of points to train on
-        total_train = len(x_all) * self.epochs
+        total_train = len(x_all) * epochs
         # number of points trained on so far
         current_train = 0
         
-        for i in range(self.epochs):
+        for i in range(epochs):
             # perform multiple passes through the data
             order = np.arange(len(x_all))
             # array of indexes in random order - used for SGD   
@@ -191,7 +155,7 @@ class strela_net():
             for n in order:
                 # generate the prediction; pass 2D array pull off first
                 # element to get 1D array
-                y_pre = self.predict([x_all[n]], training = True)[0]
+                y_pre = self.predict([x_all[n]])[0]
                 # calculate the sigma of the last layer - layer L
                 self.delta_l[self.total_layers] = self.dx_ds(y_pre)\
                  * self.de_dx(y_pre, y_all[n])
@@ -209,22 +173,20 @@ class strela_net():
                         + self.reg * self.weights[l]  # regularization term
                 current_train += 1
                 # change divisor to tune how often progress bar prints out
-                if (current_train % (total_train/10) == 0) and not self.quiet:
+                if current_train % (total_train/20) == 0:
                     print("%.1f%% of training complete" %(current_train/total_train * 100))
 
         return
     
-    def predict(self, x_all, training = False):
+    def predict(self, x_all):
         '''generates a prediction based on the current weights of the net.
         the result of each for the most recent point is stored in self.x_l
         inputs: x_all - 2d array of each x point to generate a prediction on
-                training - specifies if method call is for training net
         outputs: y_pre - 2d array of predicted y_coordinates'''
         
         # set up array of result of predictions
         y_pre = np.zeros((len(x_all), self.n_outputs))
         
-        # iterate through the set of x inputs and make predictions
         for n in range(len(x_all)):
             # reshape the input into a 2D n x 1 array
             self.x_l[0][1:] = sh.make_2d(x_all[n])
@@ -236,13 +198,9 @@ class strela_net():
             # prediction is the output of the final layer
             # reshape to be one dimensional array output
             y_pre[n] = (self.x_l[self.total_layers]).reshape(self.n_outputs,)
-
             # apply softmax if set to do so
             if self.softmax:
                 y_pre[n] = sh.apply_softmax(y_pre[n])
-            # for actual predictions (not training) apply encoding
-            if training == False:
-                y_pre[n] = self.apply_encoding(y_pre[n])
 
         # return array of predictions
         return y_pre
@@ -260,7 +218,6 @@ class strela_net():
             # implementation of different activation functions
             if self.act == "tanh":
                 return(np.exp(s) - np.exp(-s))/(np.exp(s) + np.exp(-s))
-            # add new activation functions here
 
         else:
              # otherwise iterate through and perform recursive call
@@ -274,12 +231,13 @@ class strela_net():
         inputs: y_pre - predicted y value
                 y_n - true y value'''
 
+
         # de over dx for different loss functions
         if self.loss == "squared":
             # de/dx of squared loss: e = (y-yn) ** 2
             de_dx = 2 * (y_pre - y_n)
         if self.loss == "cce":
-            # de/dx of cross-entropy: e = -(ynlog(y) + (1-yn)log(1-y))
+            # de/dx of cross-entropy: -(ynlog(y) + (1-yn)log(1-y))
             de_dx = -1 * y_n/y_pre + (1-y_n)/(1-y_pre)
 
         return sh.make_2d(de_dx)
@@ -296,19 +254,6 @@ class strela_net():
             dx_ds = (1 - x_l**2)
 
         return sh.make_2d(dx_ds)
-
-    def apply_encoding(self, y_pre_raw):
-        '''applies output encoding to change raw output into different form'''
-        if self.out_encode == None:
-            # no change to the output
-            return y_pre_raw
-        if self.out_encode == "one_hot":
-            # one hot encoding - largest value set to 1 all others 0
-            return sh.convert_one_hot(y_pre_raw)
-        if self.out_encode == "binary":
-            # binary encoding - values > 0 become 1 others are -1
-            return sh.convert_binary(y_pre_raw)
-
 
     def set_weights(self, layer, new_weights):
         '''set the weights of a specific layer. If the passed weights
@@ -344,21 +289,15 @@ class strela_net():
             print("Activation function not recognized; must be in: ")
             print(self.supported_act)
             error = True
-        if self.out_encode not in self.supported_encoding:
-            print("Output encoding not recognized; must be in: ")
-            print(self.supported_encoding[1:])
-            error = True
         # categorical cross entropy requires [0, 1] output; softmax must be one
-        if (self.loss == "cce" and self.softmax == False):
+        if (self.loss == "cce" and softmax == False):
             print("Categorical cross entropy requires softmax")
             error = True
         # check that appropriate inputs are integers
-        for parameter in [self.n_inputs, self.n_outputs, self.h_layers, \
-        self.h_layers_d, self.epochs]:
-            # check that input is an integer
+        for parameter in [self.n_inputs, self.n_outputs, self.hidden_layers, self.hidden_layers_d]:
             if type(parameter) != type(0):
-                print("Inputs, outputs, hidden layers, epochs, and ", \
-                    "hidden layer dimensions must be integers")
+                print("Inputs, outputs, hidden layers, and\
+                    hidden layer dimensions must be integers")
                 error = True
                 break
 
@@ -367,7 +306,6 @@ class strela_net():
 
     def show_weights(self):
         '''prints the weights of the neural net in pretty form'''
-        print("=== Printing weights matrix (inputs, outputs) ===")
         for l in range(1, self.total_layers + 1):
             print("Layer: ", l)
             print(self.weights[l])
@@ -376,49 +314,22 @@ class strela_net():
 
     def __repr__(self):
         '''prints info about the instance of strela'''
-        output_string = '\n=== Instance of strela_net class ===\n'
-        output_string += "%d inputs,        %d outputs\n"\
-        %(self.n_inputs, self.n_outputs)
+        output_string = 'Instance of strela_net class\n'
+        output_string += "%d inputs, %d outputs\n" %(self.n_inputs, self.n_outputs)
         output_string += "%d hidden layers, %d nodes per hidden layer\n"\
         %(self.h_layers, self.h_layers_d)
         output_string += "Regularization lambda: %f\n" %(self.reg)
-        output_string += "Activation function:   %s\n" %(self.act)
-        output_string += "Loss function:         %s\n" %(self.loss)
-        output_string += "Output encoding:       %s\n" %(self.out_encode)
-        output_string += "Softmax:               %s\n" %(self.softmax)
+        output_string += "Activation function: %s\n" %(self.act)
+        output_string += "Loss function: %s\n" %(self.loss)
 
         return output_string
 
-def strela_help():
-    '''prints the required and optional strela_net arguments'''
 
-    # create a dummy instance of net to access the supported functions
-    dummy = strela_net(1, 1, 1, 1, quiet = True)
 
-    print("\n=== Strela net required and optional arguments: ===")
-    # info on required arguments
-    print("Arg 1:  inputs     (int) - dimension of input space")
-    print("Arg 2:  outputs    (int) - dimension of output space")
-    print("Arg 3:  h_layers   (int) - number of hidden layers")
-    print("Arg 4:  h_layers_d (int) - number of nodes per hidden layer")
-    print("-----")
-    # info on optional numerical arguments
-    print("Opt.:   lr         (flt) - learning rate                  default: ", dummy.lr)
-    print("Opt.:   reg        (flt) - regularization lambda          default: ", dummy.reg)
-    print("Opt.:   epochs     (int) - passes through training data   default: ", dummy.epochs)
-    print("-----")
-    # info on optional text arguments
-    print("Opt.:   loss       (str) - loss function                  default: ", dummy.loss)
-    print("Opt.:   act        (str) - activation function            default: ", dummy.act)
-    print("Opt.:   out_encode (str) - output encoding                default: ", dummy.out_encode)
-    print("Opt.:   softmax    (bool)- turn on softmax                default: ", dummy.softmax)
-    print("Opt.:   quiet      (bool)- suppress print statements      default: ", dummy.quiet)
-    print("-----")
-    # info on supported functions
-    print("Supported loss functions:       ", dummy.supported_loss)
-    print("Supported activation functions: ", dummy.supported_act)
-    print("Supported output encodings:     ", dummy.supported_encoding)
-    print("-----")
-    
-    return
+
+
+
+
+
+
 
